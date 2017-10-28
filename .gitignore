@@ -1,0 +1,8 @@
+main.py
+
+*.swo
+*.swp
+__pycache__/
+*.session
+log/
+media/
