@@ -1,5 +1,6 @@
 main.py
 
+*.pyc
 *.swo
 *.swp
 __pycache__/

@@ -1,6 +1,7 @@
 # Telistry
 
-Telegram currently doesn't give you any [reasonable](https://telegram.wiki/general/pdfexport) way to get a local copy of your entire chat history, so Telistry will do it for you instead.
+Telegram currently doesn't give you any [reasonable](https://telegram.wiki/general/pdfexport) way to get a local copy of your entire chat history.
+Telistry is a Python 3 script that will download the entire history of all of your open chats to local text files. Images and other files that were sent in those chats will also be downloaded.
 
 Using it is simple:
 ```python
