@@ -147,3 +147,12 @@ def run(api_id, api_hash, phone_number):
         messages = get_history(client, user)
         print('Writing %d messages of history for %s...' % (len(messages), user['name']))
         write_history(client, users, user, messages)
+
+if __name__ == "__main__":
+  import argparse
+  parser = argparse.ArgumentParser(description='Download your telegram chat history reasonably')
+  parser.add_argument('api_id', help='The API for your app')
+  parser.add_argument('api_hash', help='The API secret hash')
+  parser.add_argument('phone_number', help='The phone number of the account')
+  args = parser.parse_args()
+  run(args.api_id,args.api_hash,args.phone_number)
