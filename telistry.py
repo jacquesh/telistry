@@ -1,6 +1,7 @@
 import os.path
 
 from telethon import TelegramClient
+from telethon.utils import get_display_name
 from telethon.tl.types import (
     Chat, User,
     MessageMediaPhoto, MessageMediaDocument,
@@ -11,15 +12,6 @@ from telethon.tl.types import (
 log_root = 'log'
 media_root = 'media'
 media_tmp = os.path.join(media_root, 'tmp')
-
-def get_user_name(user):
-    first_name = ''
-    last_name = ''
-    if user.first_name is not None:
-        first_name = user.first_name
-    if user.last_name is not None:
-        last_name = user.last_name
-    return first_name+' '+last_name
 
 def get_entity_last_msg(tmp_user):
     entity_dir = os.path.join(log_root, tmp_user['name'])
@@ -51,14 +43,9 @@ def get_all_pseudousers(client, entities):
     me = client.get_me()
     for e in entities+[me]:
         tmp_user = {}
-        if isinstance(e, User):
-            tmp_user['name'] = get_user_name(e).strip()
-            tmp_user['peer'] = PeerUser(e.id)
-        elif isinstance(e, Chat):
-            tmp_user['name'] = e.title.strip()
-            tmp_user['peer'] = PeerChat(e.id)
-
+        tmp_user['peer'] = e
         tmp_user['id'] = e.id
+        tmp_user['name'] = get_display_name(e).strip()
         tmp_user['last_msg_id'] = get_entity_last_msg(tmp_user)
         users[e.id] = tmp_user
     return users
@@ -97,10 +84,10 @@ def get_history(client, pseudouser):
     last_msg_id = 0
     messages = []
     while True:
-        _,tmp_messages,_ = client.get_message_history(pseudouser['peer'],
-                                                      limit=4096,
-                                                      offset_id=last_msg_id,
-                                                      min_id=pseudouser['last_msg_id'])
+        tmp_messages = client.get_messages(pseudouser['peer'],
+                                               limit=4096,
+                                               offset_id=last_msg_id,
+                                               min_id=pseudouser['last_msg_id'])
         if len(tmp_messages) == 0:
             break
         last_msg_id = tmp_messages[-1].id
@@ -123,13 +110,13 @@ def write_history(client, all_users, user, messages):
             media_type = type(msg.media).__name__
             media_caption = getattr(msg.media, 'caption', '')
             content = '[%s] %s' % (media_type, media_caption)
-        elif hasattr(msg, 'action'):
+        elif hasattr(msg, 'action') and msg.action:
             # TODO: Print a prettier message for the action
             content = 'Action:\n' + msg.action.stringify()
         else:
             content = ''
 
-        if hasattr(msg, 'message'):
+        if hasattr(msg, 'message') and msg.message:
             content += msg.message
 
         username = 'UNKNOWNUSER'
@@ -150,11 +137,13 @@ def run(api_id, api_hash, phone_number):
         auth_code = input('Enter the authentication code you received:')
         client.sign_in(phone_number, auth_code)
 
-    print("Collecting open chat diaglogs...")
-    dialogs, entities = client.get_dialogs()
+    print("Collecting open chat dialogs...")
+    dialogs = client.get_dialogs()
+    entities = [d.entity for d in dialogs]
     users = get_all_pseudousers(client, entities)
 
     for uid, user in users.items():
         print('Downloading history for %s...' % user['name'])
         messages = get_history(client, user)
+        print('Writing %d messages of history for %s...' % (len(messages), user['name']))
         write_history(client, users, user, messages)
