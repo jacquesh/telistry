@@ -1,4 +1,5 @@
 main.py
+.stignore
 
 *.pyc
 *.swo
@@ -7,3 +8,4 @@ __pycache__/
 *.session
 log/
 media/
+env/

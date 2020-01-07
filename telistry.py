@@ -1,3 +1,4 @@
+import asyncio
 import os.path
 
 from telethon import TelegramClient
@@ -38,9 +39,9 @@ def get_entity_last_msg(tmp_user):
         last_newline = log_contents.rfind('\n', 0, line_end_index)
     return 0
 
-def get_all_pseudousers(client, entities):
+async def get_all_pseudousers(client, entities):
     users = {}
-    me = client.get_me()
+    me = await client.get_me()
     for e in entities+[me]:
         tmp_user = {}
         tmp_user['peer'] = e
@@ -57,7 +58,7 @@ def message_media_exists(msg):
             return True
     return False
 
-def download_message_media(client, msg):
+async def download_message_media(client, msg):
     os.makedirs(media_tmp, exist_ok=True)
     if message_media_exists(msg):
         return
@@ -72,7 +73,7 @@ def download_message_media(client, msg):
                 download_destination = os.path.join(media_tmp, 'temp'+attrib_ext)
 
 
-    tmp_filename = client.download_media(msg.media, file=download_destination)
+    tmp_filename = await client.download_media(msg.media, file=download_destination)
     if tmp_filename is None:
         return
     _, extension = os.path.splitext(tmp_filename)
@@ -80,21 +81,21 @@ def download_message_media(client, msg):
     media_path = os.path.join(media_root, media_name)
     os.rename(tmp_filename, media_path)
 
-def get_history(client, pseudouser):
+async def get_history(client, pseudouser):
     last_msg_id = 0
     messages = []
     while True:
-        tmp_messages = client.get_messages(pseudouser['peer'],
-                                               limit=4096,
-                                               offset_id=last_msg_id,
-                                               min_id=pseudouser['last_msg_id'])
+        tmp_messages = await client.get_messages(pseudouser['peer'],
+                                                limit=4096,
+                                                offset_id=last_msg_id,
+                                                min_id=pseudouser['last_msg_id'])
         if len(tmp_messages) == 0:
             break
         last_msg_id = tmp_messages[-1].id
         messages += tmp_messages
     return messages
 
-def write_history(client, all_users, user, messages):
+async def write_history(client, all_users, user, messages):
     user_dir = os.path.join(log_root, user['name'])
     os.makedirs(user_dir, exist_ok=True)
 
@@ -106,7 +107,7 @@ def write_history(client, all_users, user, messages):
     for msg in reversed(messages):
         # Useful fields: msg.id, msg.date, msg.from_id
         if getattr(msg, 'media', None):
-            download_message_media(client, msg)
+            await download_message_media(client, msg)
             media_type = type(msg.media).__name__
             media_caption = getattr(msg.media, 'caption', '')
             content = '[%s] %s' % (media_type, media_caption)
@@ -126,27 +127,32 @@ def write_history(client, all_users, user, messages):
         outfile.write('%d @ %s: <%s> %s\n' % (msg.id, str(msg.date), username, content))
     outfile.close()
 
-def run(api_id, api_hash, phone_number):
+async def runAsync(api_id, api_hash, phone_number):
     session_id = 'chat_downloader_session'
     client = TelegramClient(session_id, api_id=api_id, api_hash=api_hash)
 
     print("Connecting to the Telegram service...")
-    client.connect()
-    if not client.is_user_authorized():
-        client.send_code_request(phone_number)
+    await client.connect()
+    if not await client.is_user_authorized():
+        await client.send_code_request(phone_number)
         auth_code = input('Enter the authentication code you received:')
-        client.sign_in(phone_number, auth_code)
+        await client.sign_in(phone_number, auth_code)
 
     print("Collecting open chat dialogs...")
-    dialogs = client.get_dialogs()
+    dialogs = await client.get_dialogs()
     entities = [d.entity for d in dialogs]
-    users = get_all_pseudousers(client, entities)
+    users = await get_all_pseudousers(client, entities)
 
     for uid, user in users.items():
         print('Downloading history for %s...' % user['name'])
-        messages = get_history(client, user)
+        messages = await get_history(client, user)
         print('Writing %d messages of history for %s...' % (len(messages), user['name']))
-        write_history(client, users, user, messages)
+        await write_history(client, users, user, messages)
+
+    await client.disconnect();
+
+def run(api_id, api_hash, phone_number):
+    asyncio.run(runAsync(api_id, api_hash, phone_number))
 
 if __name__ == "__main__":
   import argparse
